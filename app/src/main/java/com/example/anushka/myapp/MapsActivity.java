@@ -1,19 +1,10 @@
 package com.example.anushka.myapp;
 
-import android.*;
-import android.Manifest;
-import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Geocoder;
 import android.location.Location;
-import android.location.LocationListener;
-import android.location.LocationManager;
-import android.net.Uri;
-import android.provider.Settings;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
+import android.support.v4.app.FragmentActivity;
 import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
@@ -24,22 +15,11 @@ import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonArrayRequest;
 import com.example.anushka.myapp.model.Coordinates;
 import com.example.anushka.myapp.volley.VolleySingleton;
-import com.google.android.gms.appindexing.Action;
-import com.google.android.gms.appindexing.AppIndex;
-import com.google.android.gms.appindexing.Thing;
-import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.identity.intents.Address;
-import com.google.android.gms.location.places.ui.PlaceAutocompleteFragment;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.LatLngBounds;
-
-import java.io.IOException;
-import java.lang.reflect.Type;
-
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.gson.Gson;
@@ -55,57 +35,44 @@ import com.google.maps.model.EncodedPolyline;
 
 import org.json.JSONArray;
 
+import java.io.IOException;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
 
     private GoogleMap mMap;
-    private ArrayList<Coordinates> coordinates;
-    int count = 0;
+    int count = 100;
     private GPSTracker gpsTracker;
     private Location nLocation;
-    double latitudes;
-    double longtitudes;
+    double sourcelatitudes;
+    double sourcelongitudes;
+    double destinationLatitudes;
+    double destinationLongitudes;
 
-    /**
-     * ATTENTION: This was auto-generated to implement the App Indexing API.
-     * See https://g.co/AppIndexing/AndroidStudio for more information.
-     */
-    private GoogleApiClient client;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
-        gpsTracker =new GPSTracker(getApplicationContext());
-        nLocation =gpsTracker.getLocation();
-        latitudes=nLocation.getLatitude();
-        longtitudes=nLocation.getLongitude();
-        coordinates = new ArrayList<>();
-        // Obtain the SupportMapFragment and get notified when the map is ready to be used.
+        gpsTracker = new GPSTracker(getApplicationContext());
+        nLocation = gpsTracker.getLocation();
+        sourcelatitudes = nLocation.getLatitude();
+        sourcelongitudes = nLocation.getLongitude();
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
-
-        jsonRequest();
-        // ATTENTION: This was auto-generated to implement the App Indexing API.
-        // See https://g.co/AppIndexing/AndroidStudio for more information.
-        client = new GoogleApiClient.Builder(this).addApi(AppIndex.API).build();
     }
-
-    Double gLat = 0.00;
-    Double gLang = 0.00;
-
 
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
-        updateMap(gLat,gLang);
-        //getDeviceLocation();
+        updateMap();
 
     }
-    List<android.location.Address>  addressList = null;
+
+    List<android.location.Address> addressList = null;
 
     public void onMapSearch(View view) {
         EditText locationSearch = (EditText) findViewById(R.id.editText);
@@ -120,33 +87,32 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 e.printStackTrace();
             }
             android.location.Address address = addressList.get(0);
-            LatLng destination = new LatLng(address.getLatitude(), address.getLongitude());
-            mMap.addMarker(new MarkerOptions().position(destination).title("Marker"));
-            mMap.animateCamera(CameraUpdateFactory.newLatLng(destination));
-          //  return address.getLatitude(),address.getLongitude();
-
+            destinationLatitudes = address.getLatitude();
+            destinationLongitudes = address.getLongitude();
+            destination = new LatLng(destinationLatitudes, destinationLongitudes);
+            mMap.addMarker(new MarkerOptions().position(destination));
         }
+        drawRoute();
     }
 
-    private void updateMap(double sourcelat,double sourcelong) {
+    LatLng source;
+    LatLng destination;
+
+    private void updateMap() {
         //android.location.Address address;
-        LatLng barcelona = new LatLng(latitudes, longtitudes);
-        mMap.addMarker(new MarkerOptions().position(barcelona));
+        source = new LatLng(sourcelatitudes, sourcelongitudes);
+        mMap.addMarker(new MarkerOptions().position(source));
+    }
 
-        LatLng madrid = new LatLng(27.7172, 87.2460987);
-        mMap.addMarker(new MarkerOptions().position(madrid));
-
-        LatLng zaragoza = new LatLng(27.7172, 85.3240);
-
-        //Define list to get all latlng for the route
+    private void drawRoute() {
         List<LatLng> path = new ArrayList();
 
-
-        //Execute Directions API request
         GeoApiContext context = new GeoApiContext.Builder()
                 .apiKey(getResources().getString(R.string.google_maps_key))
                 .build();
-        DirectionsApiRequest req = DirectionsApi.getDirections(context, barcelona.latitude + "," + barcelona.longitude, madrid.latitude + "," + madrid.longitude);
+
+//        String response = getDirectionsUrl(source, destination);
+        DirectionsApiRequest req = DirectionsApi.getDirections(context, source.latitude + "," + source.longitude, destination.latitude + "," + destination.longitude);
 
         try {
             DirectionsResult res = req.await();
@@ -192,29 +158,44 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             Log.e("map", ex.getLocalizedMessage());
         }
 
-        if (count >= 500) {
-            //Draw the polyline
-            if (path.size() > 0) {
-                PolylineOptions opts = new PolylineOptions().addAll(path).color(Color.RED).width(5);
-                mMap.addPolyline(opts);
-            }
-        } else if(count >=250 && count<500) {
-            if (path.size() > 0) {
-                PolylineOptions opts = new PolylineOptions().addAll(path).color(Color.YELLOW).width(5);
-                mMap.addPolyline(opts);
-            }
+
+        if (path.size() > 0) {
+            PolylineOptions opts = new PolylineOptions().addAll(path).color(Color.RED).width(5);
+            mMap.addPolyline(opts);
         }
-        else {
-            if (path.size() > 0) {
-                PolylineOptions opts = new PolylineOptions().addAll(path).color(Color.GREEN).width(5);
-                mMap.addPolyline(opts);
-            }
-        }
+
+
         mMap.getUiSettings().setZoomControlsEnabled(true);
 
-        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(zaragoza, 10f));
+        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(source, 18));
+
     }
 
+
+    private String getDirectionsUrl(LatLng origin, LatLng dest) {
+        // Origin of route
+        String str_origin = "origin=" + origin.latitude + "," + origin.longitude;
+
+        // Destination of route
+        String str_dest = "destination=" + dest.latitude + "," + dest.longitude;
+
+        // Sensor enabled
+        String sensor = "sensor=false";
+
+        //Adding Alternative parameter
+        String alternative = "alternatives=true";
+
+        // Building the parameters to the web service
+        String parameters = str_origin + "&" + str_dest + "&" + sensor + "&" + alternative;
+
+        // Output format
+        String output = "json";
+
+        // Building the url to the web service
+        String url = "https://maps.googleapis.com/maps/api/directions/" + output + "?" + parameters;
+
+        return url;
+    }
 
     private void jsonRequest() {
 
@@ -226,12 +207,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         String jsonOutput = response.toString();
                         Type listType = new TypeToken<ArrayList<Coordinates>>() {
                         }.getType();
-                        coordinates = gson.fromJson(jsonOutput, listType);
-                        gLat = coordinates.get(0).getLat();
-                        gLang = coordinates.get(0).getLang();
-                        updateMap(gLat, gLang);
-                        count = coordinates.get(0).getVechicleCount();
 
+//                        updateMap(gLat, gLang);
 
                     }
                 }, new Response.ErrorListener() {
@@ -243,43 +220,4 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         VolleySingleton.getInstance().getQueue().add(req);
     }
-
-
-    /**
-     * ATTENTION: This was auto-generated to implement the App Indexing API.
-     * See https://g.co/AppIndexing/AndroidStudio for more information.
-     */
-    public Action getIndexApiAction() {
-        Thing object = new Thing.Builder()
-                .setName("Maps Page") // TODO: Define a title for the content shown.
-                // TODO: Make sure this auto-generated URL is correct.
-                .setUrl(Uri.parse("http://[ENTER-YOUR-URL-HERE]"))
-                .build();
-        return new Action.Builder(Action.TYPE_VIEW)
-                .setObject(object)
-                .setActionStatus(Action.STATUS_TYPE_COMPLETED)
-                .build();
-    }
-
-    @Override
-    public void onStart() {
-        super.onStart();
-
-        // ATTENTION: This was auto-generated to implement the App Indexing API.
-        // See https://g.co/AppIndexing/AndroidStudio for more information.
-        client.connect();
-        AppIndex.AppIndexApi.start(client, getIndexApiAction());
-    }
-
-    @Override
-    public void onStop() {
-        super.onStop();
-
-        // ATTENTION: This was auto-generated to implement the App Indexing API.
-        // See https://g.co/AppIndexing/AndroidStudio for more information.
-        AppIndex.AppIndexApi.end(client, getIndexApiAction());
-        client.disconnect();
-    }
-
-
 }
